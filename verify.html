@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Verify Account · X Panel</title>
+  <style>
+    :root{--bg:#060812;--glass:rgba(255,255,255,.07);--b:rgba(255,255,255,.14);--t:rgba(255,255,255,.92);--m:rgba(255,255,255,.65);--a:#00d4ff;--a2:#7b61ff}
+    *{box-sizing:border-box} body{margin:0;min-height:100vh;display:grid;place-items:center;color:var(--t);
+      font-family:system-ui,Segoe UI,Roboto,Arial;background:
+      radial-gradient(900px 500px at 10% 10%, rgba(0,212,255,.22), transparent 60%),
+      radial-gradient(800px 500px at 90% 20%, rgba(123,97,255,.18), transparent 55%),
+      linear-gradient(180deg,#070a12,#05060a);
+    }
+    .card{width:min(420px,92vw);border:1px solid var(--b);background:linear-gradient(180deg,rgba(255,255,255,.09),rgba(255,255,255,.04));
+      border-radius:18px;backdrop-filter:blur(16px);box-shadow:0 18px 60px rgba(0,0,0,.55);padding:18px}
+    .title{display:flex;align-items:center;gap:10px;font-weight:950;letter-spacing:.6px;text-transform:uppercase}
+    .logo{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;
+      background:radial-gradient(circle at 30% 30%, rgba(0,212,255,.9), transparent 60%),
+               radial-gradient(circle at 70% 70%, rgba(123,97,255,.7), transparent 55%),
+               rgba(255,255,255,.05);
+      border:1px solid rgba(255,255,255,.14)
+    }
+    .sub{margin-top:6px;color:var(--m);font-size:12px}
+    input{width:100%;padding:12px;border-radius:14px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.35);color:var(--t);outline:none;margin-top:10px;text-align:center;font-size:24px;letter-spacing:8px}
+    .row{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+    .btn{flex:1;padding:12px;border-radius:14px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:var(--t);font-weight:900;cursor:pointer}
+    .btn.primary{border:0;color:#00131c;background:linear-gradient(135deg,rgba(0,212,255,.95),rgba(123,97,255,.85))}
+    .btn.secondary{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.08)}
+    .msg{margin-top:10px;color:var(--m);font-size:12px;min-height:16px}
+    .success{color:#7CFF7C}
+    .error{color:#ff6b6b}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="title"><div class="logo">✅</div> Verify Account</div>
+    <div class="sub">Enter the 6-digit verification code sent to your email</div>
+
+    <input id="code" placeholder="000000" maxlength="6" autocomplete="off">
+    <div style="display:flex;gap:8px;margin-top:8px;justify-content:center">
+      <button class="btn secondary" onclick="resendCode()" style="flex:0">Resend Code</button>
+    </div>
+
+    <div class="row">
+      <button class="btn primary" onclick="verifyCode()">Verify</button>
+      <button class="btn" onclick="location.href='/login'">Back to Login</button>
+    </div>
+
+    <div class="msg" id="m"></div>
+    <div class="sub" style="margin-top:8px">Check your email (including spam folder) for the verification code.</div>
+  </div>
+
+<script>
+  const urlParams = new URLSearchParams(window.location.search);
+  const username = urlParams.get('username') || '';
+
+  async function verifyCode() {
+    const m = document.getElementById('m');
+    const code = document.getElementById('code').value.trim();
+    
+    if (!code || code.length !== 6 || !/^\d+$/.test(code)) {
+      m.innerHTML = '<span class="error">Please enter the 6-digit verification code</span>';
+      return;
+    }
+    
+    if (!username) {
+      m.innerHTML = '<span class="error">Username not found. Please go back and register again.</span>';
+      return;
+    }
+    
+    m.innerHTML = 'Verifying...';
+    
+    try {
+      const r = await fetch('/api/auth/verify', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username, code})
+      });
+      const d = await r.json();
+      
+      if (d.success) {
+        m.innerHTML = '<span class="success">✅ Account verified! Redirecting to login...</span>';
+        setTimeout(() => location.href = '/login', 1500);
+      } else {
+        m.innerHTML = '<span class="error">' + (d.message || 'Verification failed') + '</span>';
+      }
+    } catch(e) {
+      m.innerHTML = '<span class="error">Server error. Please try again.</span>';
+    }
+  }
+
+  async function resendCode() {
+    const m = document.getElementById('m');
+    
+    if (!username) {
+      m.innerHTML = '<span class="error">Username not found. Please go back and register again.</span>';
+      return;
+    }
+    
+    m.innerHTML = 'Sending new code...';
+    
+    try {
+      const r = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username})
+      });
+      const d = await r.json();
+      
+      if (d.success) {
+        m.innerHTML = '<span class="success">✅ New verification code sent to your email!</span>';
+      } else {
+        m.innerHTML = '<span class="error">' + (d.message || 'Failed to resend code') + '</span>';
+      }
+    } catch(e) {
+      m.innerHTML = '<span class="error">Server error. Please try again.</span>';
+    }
+  }
+
+  // Auto-submit on Enter key
+  document.getElementById('code').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') verifyCode();
+  });
+
+  // Auto-focus code input
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('code').focus();
+    if (username) {
+      document.getElementById('m').innerHTML = '📧 Verification code sent to your email.';
+    }
+  });
+</script>
+</body>
+</html>
